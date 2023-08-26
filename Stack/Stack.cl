@@ -1,0 +1,115 @@
+class ListNode{
+
+      data:String;
+      previous:ListNode;
+
+      init(newData:String):String{
+            data<-newData
+      };
+
+      setPrevious(newNode:ListNode): ListNode {
+      		{
+                  previous <- newNode;
+	          newNode;
+	             }
+      };
+
+      getData():String{
+            data
+      };
+
+      previous(): ListNode {
+            previous
+      };
+
+};
+
+class Stack inherits IO{
+      head:ListNode;
+      size:Int<- 0;
+
+      getSize(): Int {
+       size
+      };
+
+      push(newData:String): String{
+            let newNode:ListNode <- (new ListNode) in 
+            {
+            newNode.init(newData);
+            if ( isvoid head ) then {
+                  head <- newNode;
+            } 
+            else {
+                  newNode.setPrevious(head);
+		  head<-newNode;
+	    
+            }
+            fi;
+            size <- size+1;
+            newData;
+            }
+
+      };
+
+      pop():String {
+      	let resultString:String in {
+            if ( isvoid head ) then {
+                 resultString<-"Is empty the Stack";
+            }
+            else {
+                  head <- head.previous();
+		  size<-size-1;
+		  resultString<-"We succesfully make a pop";
+	        
+            }
+	   fi;
+           resultString;
+	}
+   };
+
+   toString():String {
+ 	let auxNode:ListNode <- head,
+	resultString: String in {
+        	
+		while (not (isvoid auxNode)) loop {
+		
+               resultString <- resultString.concat(auxNode.getData());
+		auxNode <- auxNode.previous();
+		} 
+		pool;
+                resultString;
+      }
+    
+    };
+	getData(): String {
+	head.getData()
+	};
+};
+
+
+class Main inherits IO {
+      main(): Object {
+      let s:Stack <- (new Stack) in
+      {
+            s.push("A");
+            s.push("B");
+            s.push("C");
+	     
+       out_string(s.toString().concat("\n"));
+       while( not (s.getSize()=0)) loop
+        {
+	out_string(s.toString().concat("\n"));
+	 s.pop();
+	 }
+	  pool;
+
+        s;
+ 	  
+}
+
+};
+};
+
+
+
+
