@@ -1,8 +1,7 @@
 # Cool-ClassroomObjectOrientedLanguage
-Cool file 
 
 
-This repository hosts a basic compiler for the Cool programming language. Cool, short for "Classroom Object-Oriented Language," is a simple and statically-typed language designed for educational purposes. 
+This repository hosts a basic of compilers in the Cool programming language. Cool, short for "Classroom Object-Oriented Language," is a simple and statically-typed language designed for educational purposes. 
 It introduces fundamental of compilers concepts and serves as a valuable tool for learning about compilers.
 
 About Cool Language
