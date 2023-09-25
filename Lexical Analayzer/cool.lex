@@ -1,0 +1,270 @@
+/*
+ *  The scanner definition for COOL.
+ */
+
+import java_cup.runtime.Symbol;
+
+%%
+
+%{
+
+/*  Stuff enclosed in %{ %} is copied verbatim to the lexer class
+ *  definition, all the extra variables/functions you want to use in the
+ *  lexer actions should go here.  Don't remove or modify anything that
+ *  was there initially.  */
+
+    // Max size of string constants
+    static int MAX_STR_CONST = 1025;
+
+    // For assembling string constants
+    StringBuffer string_buf = new StringBuffer();
+
+    private int curr_lineno = 1;
+    int get_curr_lineno() {
+	return curr_lineno;
+    }
+
+    private AbstractSymbol filename;
+
+    void set_filename(String fname) {
+	filename = AbstractTable.stringtable.addString(fname);
+    }
+
+    AbstractSymbol curr_filename() {
+	return filename;
+    }
+
+    private int parent_len = 0;
+
+    int get_paren_len(){
+
+      return parent_len;
+
+    }
+    
+    void reset_parent_len (){
+      parent_len = 0;
+    }
+    
+%}
+
+%init{
+
+/*  Stuff enclosed in %init{ %init} is copied verbatim to the lexer
+ *  class constructor, all the extra initialization you want to do should
+ *  go here.  Don't remove or modify anything that was there initially. */
+
+    // empty for now
+%init}
+
+%eofval{
+
+/*  Stuff enclosed in %eofval{ %eofval} specifies java code that is
+ *  executed when end-of-file is reached.  If you use multiple lexical
+ *  states and want to do something special if an EOF is encountered in
+ *  one of those states, place your code in the switch statement.
+ *  Ultimately, you should return the EOF symbol, or your lexer won't
+ *  work.  */
+
+    switch(yy_lexical_state) {
+    case YYINITIAL:
+      return new Symbol(TokenConstants.EOF);
+    case LINE_COMMENT:
+      yybegin(YYINITIAL); 
+	break;
+    case BLOCK_COMMENT:
+      yybegin(YYINITIAL);
+      return new Symbol(TokenConstants.ERROR, "eof is comment" );
+     
+    case STRING_MODE:
+       yybegin(YYINITIAL);
+      string_buf = new StringBuffer();
+      return new Symbol(TokenConstants.ERROR, "eof is string comment"); 
+      
+    }   
+%eofval}
+
+%class CoolLexer
+%cup
+
+VTAB = \x0b
+NEWLINE = \n
+WHITESPACE = " "
+BACKSPACE = \b
+TAB = \t
+FORMFEED = \f
+CARRIAGE = \r
+
+
+%state BLOCK_COMMENT
+%state LINE_COMMENT
+%state STRING_MODE
+
+%%
+
+
+<YYINITIAL> "\"" { yybegin(STRING_MODE); }
+
+<STRING_MODE>"\"" { /* Finds the begging of the string*/
+
+  yybegin(YYINITIAL);
+
+  if(string_buf.length() > MAX_STR_CONST){
+    return new Symbol(TokenConstants.ERROR, "String too long");
+      
+      } else {
+        String s = string_buf.toString();
+	string_buf = new StringBuffer();
+	return new Symbol(TokenConstants.STR_CONST, AbstractTable.stringtable.addString(s));
+  } 
+ }
+
+
+
+<STRING_MODE>\0[^"\""]*["\""] {
+/* Finds a empty string with more than one string*/
+
+  yybegin(YYINITIAL);
+  string_buf = new StringBuffer();
+  return new Symbol(TokenConstants.ERROR, "String contains escaped null character"); 
+
+}
+
+
+<STRING_MODE>\n { 
+  yybegin(YYINITIAL);
+  string_buf = new StringBuffer();
+  curr_lineno++;
+  return new Symbol(TokenConstants.ERROR, "String contains null character");
+} 
+
+
+<STRING_MODE>. { 
+  string_buf = string_buf.append(yytext().charAt(0));
+} 
+
+<STRING_MODE>\\[{WHITESPACE}{TAB}{BACKSPACE}{FORMFEED}{CARRIAGE}{VTAB}]*\n { 
+  string_buf = string_buf.append("\n");
+  curr_lineno++;
+} 
+
+<STRING_MODE>\\.  { 
+                    if (yytext().equals("\\n")) {
+                        string_buf = string_buf.append('\n'); 
+                    } else if (yytext().equals("\\b")){
+                        string_buf = string_buf.append('\b'); 
+                    } else if (yytext().equals("\\t")){
+                        string_buf = string_buf.append('\t'); 
+                    } else if (yytext().equals("\\f")){
+                        string_buf = string_buf.append('\f'); 
+                    } else if (yytext().equals("\\\000")){
+                        yybegin(YYINITIAL);
+                        string_buf = new StringBuffer();
+                        return new Symbol(TokenConstants.ERROR, "String contains null character");
+                    } else {
+                        string_buf = string_buf.append(yytext().charAt(1));
+                    }
+                }
+
+
+<YYINITIAL>"(*" { parent_len++; yybegin(BLOCK_COMMENT);}
+
+<YYINITIAL>"*)" { return new Symbol(TokenConstants.ERROR, "Unmatched *)");}
+
+<BLOCK_COMMENT> "(*"  { parent_len++; }
+<BLOCK_COMMENT> "*)"  { 
+                    parent_len--;  
+		    if(parent_len < 0){
+                         return new Symbol(TokenConstants.ERROR, "Error:)");
+                   } else if(parent_len == 0) {
+                       yybegin(YYINITIAL);  
+                   } else {
+                  }
+ }
+
+<BLOCK_COMMENT> [^\*\(\)\n]*  {/* It skips the mayority of the characters less *characters (),  \n *  */}
+
+
+
+
+
+<BLOCK_COMMENT>\n  { curr_lineno++; }
+<BLOCK_COMMENT>. { }
+<BLOCK_COMMENT>"--" {}
+
+
+<YYINITIAL>"--"	    {yybegin(LINE_COMMENT); }
+
+<LINE_COMMENT>"(*" {   }
+<LINE_COMMENT>"*)" {   }
+
+<LINE_COMMENT>[^\n]+ {/* Do nothing */}
+
+
+<LINE_COMMENT>\n    {curr_lineno++; yybegin(YYINITIAL);}
+
+
+
+<YYINITIAL>"=>"	    { return new Symbol(TokenConstants.DARROW); }
+<YYINITIAL>"<="     { return new Symbol(TokenConstants.LE); }
+<YYINITIAL>"<-"     { return new Symbol(TokenConstants.ASSIGN); }
+
+<YYINITIAL>{NEWLINE}	 { curr_lineno++; }
+
+
+
+
+<YYINITIAL>{NEWLINE}	 { curr_lineno++; }
+<YYINITIAL>[{WHITESPACE}]+ { /* do nothing just eat it up */ }
+<YYINITIAL>[{TAB}]+ { /* do nothing just eat it up */ }
+<YYINITIAL>[{BACKSPACE}]+ { /* do nothing just eat it up */ }
+<YYINITIAL>[{FORMFEED}]+ { /* do nothing just eat it up */ }
+<YYINITIAL>[{CARRIAGE}]+ { /* do nothing just eat it up */ }
+<YYINITIAL>[{VTAB}]+ { /* do nothing just eat it up */ }
+<YYINITIAL> [\n]                {/* Newline*/ curr_lineno++; }
+
+<YYINITIAL> [{VTAB}]+           {/* Do nothing*/ }
+
+
+<YYINITIAL>[Cc][Aa][Ss][Ee]	{ return new Symbol(TokenConstants.CASE); }
+<YYINITIAL>[Cc][Ll][Aa][Ss][Ss] { return new Symbol(TokenConstants.CLASS); }
+<YYINITIAL>[Ee][Ll][Ss][Ee]  	{ return new Symbol(TokenConstants.ELSE); }
+<YYINITIAL>[Ee][Ss][Aa][Cc]	{ return new Symbol(TokenConstants.ESAC); }
+<YYINITIAL>[f][Aa][Ll][Ss][Ee]	{ return new Symbol(TokenConstants.BOOL_CONST, Boolean.FALSE);}
+<YYINITIAL>[Ff][Ii]             { return new Symbol(TokenConstants.FI); }
+<YYINITIAL>[Ii][Ff]  		{ return new Symbol(TokenConstants.IF); }
+<YYINITIAL>[Ii][Nn]             { return new Symbol(TokenConstants.IN); }
+<YYINITIAL>[Ii][Nn][Hh][Ee][Rr][Ii][Tt][Ss] { return new Symbol(TokenConstants.INHERITS); }
+<YYINITIAL>[Ii][Ss][Vv][Oo][Ii][Dd] { return new Symbol(TokenConstants.ISVOID); }
+<YYINITIAL>[Ll][Ee][Tt]         { return new Symbol(TokenConstants.LET); }
+<YYINITIAL>[Ll][Oo][Oo][Pp]  	{ return new Symbol(TokenConstants.LOOP); }
+<YYINITIAL>[Nn][Ee][Ww]		{ return new Symbol(TokenConstants.NEW); }
+<YYINITIAL>[Nn][Oo][Tt] 	{ return new Symbol(TokenConstants.NOT); }
+<YYINITIAL>[Oo][Ff]		{ return new Symbol(TokenConstants.OF); }
+<YYINITIAL>[Pp][Oo][Oo][Ll]  	{ return new Symbol(TokenConstants.POOL); }
+<YYINITIAL>[Tt][Hh][Ee][Nn]   	{ return new Symbol(TokenConstants.THEN); }
+<YYINITIAL>[t][Rr][Uu][Ee]	{ return new Symbol(TokenConstants.BOOL_CONST, Boolean.TRUE); }
+<YYINITIAL>[Ww][Hh][Ii][Ll][Ee] { return new Symbol(TokenConstants.WHILE); }
+<YYINITIAL> [0-9]+              { return new Symbol(TokenConstants.INT_CONST, AbstractTable.inttable.addString(yytext()));      }
+<YYINITIAL>[A-Z][_A-Za-z0-9]*  { return new Symbol(TokenConstants.TYPEID, AbstractTable.stringtable.addString(yytext())); }
+<YYINITIAL>[a-z][_A-Za-z0-9]*  { return new Symbol(TokenConstants.OBJECTID, AbstractTable.stringtable.addString(yytext())); }
+
+<YYINITIAL>"+"			{ return new Symbol(TokenConstants.PLUS); }
+<YYINITIAL>"/"			{ return new Symbol(TokenConstants.DIV); }
+<YYINITIAL>"-"			{ return new Symbol(TokenConstants.MINUS); }
+<YYINITIAL>"*"			{ return new Symbol(TokenConstants.MULT); }
+<YYINITIAL>"="			{ return new Symbol(TokenConstants.EQ); }
+<YYINITIAL>"<"			{ return new Symbol(TokenConstants.LT); }
+<YYINITIAL>"."			{ return new Symbol(TokenConstants.DOT); }
+<YYINITIAL>"~"			{ return new Symbol(TokenConstants.NEG); }
+<YYINITIAL>","			{ return new Symbol(TokenConstants.COMMA); }
+<YYINITIAL>";"			{ return new Symbol(TokenConstants.SEMI); }
+<YYINITIAL>":"			{ return new Symbol(TokenConstants.COLON); }
+<YYINITIAL>"("			{ return new Symbol(TokenConstants.LPAREN); }
+<YYINITIAL>")"			{ return new Symbol(TokenConstants.RPAREN); }
+<YYINITIAL>"@"			{ return new Symbol(TokenConstants.AT); }
+<YYINITIAL>"}"			{ return new Symbol(TokenConstants.RBRACE); }
+<YYINITIAL>"{"			{ return new Symbol(TokenConstants.LBRACE); }
+
+
+.                               {return new Symbol(TokenConstants.ERROR, yytext()); }
